@@ -1,3 +1,9 @@
 /sndbx
 .vscode
 .mypy_cache
+/src/backend/__pycache__
+/src/backend/yt_app/__pycache__
+/src/bot/__pycache__
+/src/bot/handlers/__pycache__
+todo
+
