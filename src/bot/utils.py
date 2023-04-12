@@ -3,25 +3,21 @@ from callbacks import VideoCallback
 
 
 def video_keyboard(qualities: list, action: str, counter: str):
-    builder = InlineKeyboardBuilder() 
+    builder = InlineKeyboardBuilder()
     for quality in qualities:
         builder.button(
-            text = quality,
-            callback_data = VideoCallback(
-                action=action,
-                quality=quality, 
-                url_count=counter
-            )
+            text=quality,
+            callback_data=VideoCallback(
+                action=action, quality=quality, url_count=counter
+            ),
         )
-        
+
     builder.button(
-        text = "ONLY AUDIO",
+        text="ONLY AUDIO",
         callback_data=VideoCallback(
-            action="audio",
-            quality="None",
-            url_count=counter
-        )
+            action="quality", quality="audio", url_count=counter
+        ),
     )
-    builder.adjust(2,2)
+    builder.adjust(2, 2)
 
     return builder.as_markup()

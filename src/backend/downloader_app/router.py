@@ -29,4 +29,9 @@ def get_video_data(
         video_data = get_data(video)
         return video_data.dict()
 
-    video.download()
+    try:
+        response = video.download()
+    except Exception as e:
+        response = False
+
+    return {"status": response}
