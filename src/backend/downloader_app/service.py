@@ -1,6 +1,7 @@
-import os, io, sys
+import os
 import yt_dlp
 
+from uuid import uuid4
 from .schemas import VideoData
 from .utils import time_format, format_bytes, get_resolution_height, check_thumbnail
 
@@ -44,16 +45,22 @@ class VideoMetadata:
 
         meta = ydl.extract_info(self.url, download=False)
         formats = meta.get("formats", meta)
+
         # print(meta)
 
         quality_list = []
         size_list = []  # In case i wanted to add size
 
+        print(self.resource)
         for f in formats:
+            # print(f)
             resolution = get_resolution_height(f.get("resolution", None))
+
+            if self.resource.lower().startswith("tiktok"):  # if its tiktok
+                resolution = str(f.get("height", None))
+
             size = f.get("filesize_approx", f.get("filesize", None))
             fps = f.get("fps", 25)
-
             if not fps:
                 fps = 25
 
@@ -86,7 +93,7 @@ class VideoDownload:
 
         if not metadata:
             self.quality = quality
-
+            self.video_key = uuid4()
             self.path = os.getcwd().removesuffix("/src/backend")
             self.ydl = self._get_ydl()
         else:
@@ -120,25 +127,24 @@ class VideoDownload:
                     "format": self.quality_filter,
                 }
             )
-        
+
         yo.update(
             {
                 "outtmpl": self.path
                 + f"/media/{media_path}"
-                + "/%(uploader)s/%(title)s_"
-                + f"{self.quality}"
+                + f"{self.video_key}"
                 + ".%(ext)s"
             }
         )
         return yo
-    
-    #60/30, hdr/nonhdr
+
+    # 60/30, hdr/nonhdr
     # Take a video that fits certain quality
     def quality_filter(self, info):
         formats = reversed(info["formats"])
 
         # size = f.get('filesize_approx', f.get('filesize', None))
-        
+
         fmt = {}
         for f in formats:
             if fmt.get("audio") and fmt.get("video"):
@@ -161,27 +167,26 @@ class VideoDownload:
                 if media_type == "audio" and not fmt.get("audio"):
                     fmt.update({"audio": f})
                 elif media_type == "video" and not fmt.get("video"):
-                    dr = f['dynamic_range'] # Extract dynamic range, and forbid hdr
-                    if not dr.startswith('HDR'): 
+                    dr = f["dynamic_range"]  # Extract dynamic range, and forbid hdr
+                    if not dr.startswith("HDR"):
                         fmt.update({"video": f})
 
                 self._fps_check(format_fps, chosen_fps),  # Check for chosen fps
 
-        
         audio = fmt.get("audio")
-        chosen_video = fmt.get('video')
+        chosen_video = fmt.get("video")
 
         if not audio:
             return [chosen_video]
-        
+
         else:
             res = {
-                'format_id': f'{chosen_video["format_id"]}+{audio["format_id"]}',
-                'ext': chosen_video["ext"],
-                'requested_formats': [chosen_video, audio],
-                'protocol': f'{chosen_video["protocol"]}+{audio["protocol"]}'
+                "format_id": f'{chosen_video["format_id"]}+{audio["format_id"]}',
+                "ext": chosen_video["ext"],
+                "requested_formats": [chosen_video, audio],
+                "protocol": f'{chosen_video["protocol"]}+{audio["protocol"]}',
             }
-            
+
             return [res]
 
     def _get_media_type(self, format_resolution: str, chosen_resolution: int):
@@ -231,7 +236,7 @@ class VideoDownload:
 
     def download(self):
         self.ydl.download(self.url)
-
+        return self.video_key
 
     def delete(self):
         pass
