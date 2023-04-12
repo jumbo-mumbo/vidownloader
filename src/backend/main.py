@@ -1,6 +1,5 @@
 from fastapi import FastAPI
-
-from yt_app.router import router
+from downloader_app.router import router
 
 
 def get_application():
@@ -12,4 +11,4 @@ def get_application():
 
 app = get_application()
 
-   
+
