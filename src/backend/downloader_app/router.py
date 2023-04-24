@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from .service import VideoDownload, get_video_data as get_data
+
+import os
 
 # add /api/v...
 router = APIRouter(
@@ -29,9 +32,14 @@ def get_video_data(
         video_data = get_data(video)
         return video_data.dict()
 
-    try:
-        response = video.download()
-    except Exception as e:
-        response = False
+    file_key, file_ext = video.download()
+    response = {"uuid": file_key, "ext": file_ext}
 
-    return {"status": response}
+    return response
+
+    """
+    # Downloading from server to user
+    return FileResponse(
+        path=pth + f"/media/{video_uuid}.{video_ext}",
+        filename=f"{video_uuid}.{video_ext}")
+    """

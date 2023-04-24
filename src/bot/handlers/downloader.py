@@ -20,7 +20,10 @@ class Video:
         }
 
     async def get_video(
-        self, quality: str | None = None, data_only: bool | None = False
+        self,
+        info: dict | None = {},
+        quality: str | None = None,
+        data_only: bool | None = False,
     ):
         if data_only:
             self.params.update({"metadata": data_only})
@@ -32,23 +35,26 @@ class Video:
                 req = await client.get(
                     "http://127.0.0.1:8000/v", params=self.params, timeout=None
                 )
-                response = req.json()
-                return response
+
+                info["response"] = req.json()
+                return info
 
             except Exception as e:
                 print(e)
 
 
-async def url_manager(message: types.Message):
+async def url_manager(message: types.Message, bot_message: types.Message):
     url = message.text
     user_id = message.from_user.id
     try:
         video = Video(url, user_id)
         data = await video.get_video(data_only=True)
-        await display_video_data(data, message)
+        data = data["response"]
+        await bot_message.edit_text("*Ready*", parse_mode="Markdown")
+        await display_video_data(data, bot_message)
     except Exception as e:
         print(e)
-        await message.answer(f"Unknown Error")
+        await bot_message.edit_text(f"Unknown Error")
 
 
 async def display_video_data(
@@ -70,6 +76,9 @@ async def display_video_data(
     link_counter = len(users_links[chat_id]) - 1
 
     markup = video_keyboard(qualities, "quality", str(link_counter))
+
+    text = emoji.emojize("*Choose quality*   :down_arrow:")
+    await message.edit_text(text, parse_mode="Markdown")
     await message.answer_photo(
         image,
         f"<u>Title</u>: <b>{name}</b>"
