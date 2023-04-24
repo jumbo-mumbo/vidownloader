@@ -10,7 +10,7 @@ def check_thumbnail(thumb_url: str) -> bool:
 
 
 # Format bytes to Kib, Mib...
-def format_bytes(size: float | int) -> str:
+def format_bytes(size: float | int) -> dict:
     # 2**10 = 1024
     power = 2**10
     n = 0
@@ -18,7 +18,12 @@ def format_bytes(size: float | int) -> str:
     while size > power:
         size /= power
         n += 1
-    return f"{round(size, 2)} {power_labels[n]}"
+    
+    result = {
+        "size": round(size, 2),
+        "label": power_labels[n]
+    }
+    return result
 
 
 # Remove width form resolution

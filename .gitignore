@@ -1,7 +1,11 @@
+.gitignore
+.vscode
+.dockerignore
+.mypy_cache
+requirements.txt
 /sndbx
 /media
-.vscode
-.mypy_cache
+/src/testpyro
 /src/backend/__pycache__
 /src/backend/downloader_app/__pycache__
 /src/backend/media

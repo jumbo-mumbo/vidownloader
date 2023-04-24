@@ -1,2 +1,10 @@
+/sndbx
+/media
 .vscode
 .mypy_cache
+/src/backend/__pycache__
+/src/backend/downloader_app/__pycache__
+/src/backend/media
+/src/bot/__pycache__
+/src/bot/handlers/__pycache__
+todo

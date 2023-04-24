@@ -42,39 +42,36 @@ class VideoMetadata:
 
     def _get_qualities(self):
         ydl = self.ydl
-
         meta = ydl.extract_info(self.url, download=False)
         formats = meta.get("formats", meta)
 
-        # print(meta)
-
         quality_list = []
-        size_list = []  # In case i wanted to add size
-
-        print(self.resource)
+        #size_list = []  # In case i wanted to add size
         for f in formats:
-            # print(f)
             resolution = get_resolution_height(f.get("resolution", None))
 
             if self.resource.lower().startswith("tiktok"):  # if its tiktok
                 resolution = str(f.get("height", None))
 
-            size = f.get("filesize_approx", f.get("filesize", None))
+            size = f.get("filesize_approx", f.get("filesize", 0))
+            size = format_bytes(size)
+            
             fps = f.get("fps", 25)
             if not fps:
                 fps = 25
 
-            # Better quality output (IMPROVE!!!)
             if resolution.isdecimal() and int(resolution) >= 144:
+                # Size limitation not higher than 1.5gb + 500mb to audio space
+                if size \
+                    and size['size'] > 1.5 \
+                        and size['label'] == 'GiB':
+                                continue
+
                 quality = f"{resolution}p"
-                if int(fps) > 50:
+                if int(resolution) > 720 and int(fps) > 50:
                     quality += f"{int(fps)}fps"
 
                 if quality not in quality_list:
-                    if size:
-                        size = format_bytes(size)
-                        size_list.append(f" ,{size}")
-
                     quality_list.append(quality)
 
         return quality_list[::-1]
@@ -93,7 +90,8 @@ class VideoDownload:
 
         if not metadata:
             self.quality = quality
-            self.video_key = uuid4()
+            self.file_key = uuid4()
+            self.file_ext = "mp4"
             self.path = os.getcwd().removesuffix("/src/backend")
             self.ydl = self._get_ydl()
         else:
@@ -105,11 +103,13 @@ class VideoDownload:
             return ydl
 
     def _get_options(self):
-        media_path = "videos"
-        yo = {"quiet": True}
+        yo = {
+            "quiet": True,
+            "no-part": True
+            }
 
+        #video format bad audio top
         if self.quality == "audio":
-            media_path = "audios"
             yo.update(
                 {
                     "postprocessors": [
@@ -131,14 +131,13 @@ class VideoDownload:
         yo.update(
             {
                 "outtmpl": self.path
-                + f"/media/{media_path}"
-                + f"{self.video_key}"
+                + f"/media/"
+                + f"{self.file_key}"
                 + ".%(ext)s"
             }
         )
         return yo
 
-    # 60/30, hdr/nonhdr
     # Take a video that fits certain quality
     def quality_filter(self, info):
         formats = reversed(info["formats"])
@@ -158,6 +157,7 @@ class VideoDownload:
                 f.get("format_note"),
                 f.get("height"),
             ]
+        
 
             media_type = self._get_media_type(  # Check for chosen resolution
                 format_media_marks, chosen_resolution
@@ -167,14 +167,16 @@ class VideoDownload:
                 if media_type == "audio" and not fmt.get("audio"):
                     fmt.update({"audio": f})
                 elif media_type == "video" and not fmt.get("video"):
+                    
                     dr = f["dynamic_range"]  # Extract dynamic range, and forbid hdr
-                    if not dr.startswith("HDR"):
+                    if not dr.startswith("HDR") and f['video_ext'] in ("mp4","webm"):
                         fmt.update({"video": f})
 
                 self._fps_check(format_fps, chosen_fps),  # Check for chosen fps
 
         audio = fmt.get("audio")
         chosen_video = fmt.get("video")
+        self.video_ext = chosen_video['video_ext']
 
         if not audio:
             return [chosen_video]
@@ -195,7 +197,7 @@ class VideoDownload:
 
         if (chosen_resolution in format_resolution) or (
             f"{chosen_resolution}p" in format_resolution
-        ):
+        ):  
             return "video"
 
         return False
@@ -236,8 +238,9 @@ class VideoDownload:
 
     def download(self):
         self.ydl.download(self.url)
-        return self.video_key
-
+        return self.file_key, self.file_ext
+        
+        
     def delete(self):
         pass
 
