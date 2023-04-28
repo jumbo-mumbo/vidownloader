@@ -2,47 +2,49 @@ import os
 import yt_dlp
 
 from uuid import uuid4
-from .schemas import VideoData
-from .utils import time_format, format_bytes, get_resolution_height, check_thumbnail
+from .schemas import MediaData
+from .utils import (
+    time_format, 
+    format_bytes, 
+    get_resolution_height, 
+    check_thumbnail
+    )
 
 
-class VideoMetadata:
-    def __init__(
-        self,
-        url: str,
-    ):
-        self.url = url
-        self.path = os.getcwd()
-
-        self.metadata = self.__initialize_metadata()
-        self.qualities = self._get_qualities()
-
+class DMetadata:
+    def __init__(self):
         self.title: str
         self.resource: str
         self.duration: str
+        self.duration_seconds: int
         self.thumbnail: str
-        self.quality: str
+        self.qualities: list | None = None
 
-    def __initialize_metadata(self):
-        with yt_dlp.YoutubeDL({"quiet": True}) as ydl:
-            meta = ydl.extract_info(self.url, download=False)
-            self.resource = list(ydl._ies_instances.keys())[
-                0
-            ]  # Extract video source (Youtube, Vk, etc.)
-            self.title = meta.get("title", meta)
-            self.duration = time_format(meta.get("duration", meta))
-            self.thumbnail = self._get_thumbnail(meta.get("thumbnails", meta))
-            self.ydl = ydl
+    def initialize_metadata(
+            self, 
+            ydl: yt_dlp.YoutubeDL, 
+            url: str, 
+            quality: bool = False
+            ):
+        meta = ydl.extract_info(url, download=False)
+        self.resource = list(ydl._ies_instances.keys())[0]  # Extract video source (Youtube, Vk, etc.)
+        self.title = meta.get("title", meta)
+        self.duration = time_format(meta.get("duration", meta))
+        self.duration_seconds = meta.get("duration", meta)
+        self.thumbnail = self._get_thumbnail(meta.get("thumbnails", meta))
+
+        if not quality:
+            self.qualities = self._get_qualities(meta)
+
 
     def _get_thumbnail(self, thumbnails):
         for t in thumbnails[::-1]:
             url = t["url"]
             if not url.endswith(".webp") and check_thumbnail(url):
                 return url
+            
 
-    def _get_qualities(self):
-        ydl = self.ydl
-        meta = ydl.extract_info(self.url, download=False)
+    def _get_qualities(self, meta):
         formats = meta.get("formats", meta)
 
         quality_list = []
@@ -75,30 +77,35 @@ class VideoMetadata:
         return quality_list[::-1]
 
 
-class VideoDownload:
+class Downloader(DMetadata):
     def __init__(
         self,
         url: str,
         user_id: int,
-        metadata: bool = False,
         quality: str | None = None,
     ):
         self.url = url
         self.user_id = user_id
+       
+        self.quality = quality
+        self.file_key = uuid4()
+        self.file_ext = "mp4"
+        self.path = os.getcwd().removesuffix("/src/backend")
 
-        if not metadata:
-            self.quality = quality
-            self.file_key = uuid4()
-            self.file_ext = "mp4"
-            self.path = os.getcwd().removesuffix("/src/backend")
-            self.ydl = self._get_ydl()
-        else:
-            self.meta = VideoMetadata(url=self.url)
-
+        self.ydl = self._get_ydl()
+        
     def _get_ydl(self):
-        options = self._get_options()
-        with yt_dlp.YoutubeDL(options) as ydl:
-            return ydl
+        ydl = yt_dlp.YoutubeDL
+
+        if not self.quality:
+            self.initialize_metadata(ydl({"quiet": True}), self.url)
+        
+        else:
+            options = self._get_options()
+            ydl = ydl(options)
+            self.initialize_metadata(ydl, self.url, self.quality)
+
+        return ydl
 
     def _get_options(self):
         yo = {"quiet": True, "no-part": True}
@@ -129,7 +136,6 @@ class VideoDownload:
     # Take a video that fits certain quality
     def quality_filter(self, info):
         formats = reversed(info["formats"])
-
         # size = f.get('filesize_approx', f.get('filesize', None))
 
         fmt = {}
@@ -162,7 +168,7 @@ class VideoDownload:
 
         audio = fmt.get("audio")
         chosen_video = fmt.get("video")
-        self.video_ext = chosen_video["video_ext"]
+        self.file_ext = chosen_video["video_ext"]
 
         if not audio:
             return [chosen_video]
@@ -209,8 +215,7 @@ class VideoDownload:
 
     # Parse resolution and fps from incoming quality string
     def _parse_quality(self, chosen_quality: str) -> tuple[int, int]:
-        if chosen_quality:
-            quality = chosen_quality.strip()
+        quality = chosen_quality.strip()
 
         res_idx = quality.find("p")
         fps_idx = quality.find("f")
@@ -224,22 +229,28 @@ class VideoDownload:
 
     def download(self):
         self.ydl.download(self.url)
-        return self.file_key, self.file_ext
 
-    def delete(self):
-        pass
+        result = {
+            "uuid": self.file_key,
+            "ext": self.file_ext,
+            "duration": self.duration_seconds,
+            "thumb": self.thumbnail,
+            "title": self.title,
+            }
+        
+        return result
 
 
-def get_video_data(video: VideoDownload):
-    v = video
-    data = VideoData(
-        user_id=v.user_id,
-        name=v.meta.title,
-        resource=v.meta.resource,
-        duration=v.meta.duration,
-        image_url=v.meta.thumbnail,
-        video_url=v.meta.url,
-        qualities=v.meta.qualities,
+
+def get_media_data(media: Downloader):
+    data = MediaData(
+        user_id=media.user_id,
+        name=media.title,
+        resource=media.resource,
+        duration=media.duration,
+        image_url=media.thumbnail,
+        media_url=media.url,
+        qualities=media.qualities,
     )
 
     return data
