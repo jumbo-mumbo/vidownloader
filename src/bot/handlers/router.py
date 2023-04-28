@@ -1,13 +1,18 @@
+import os
+
 from aiogram import Router
 from aiogram import types
 from aiogram import F
 
-from callbacks import VideoCallback
-from utils import monitor_downloading
+from utils import MediaCallback
 from .commands import command_manager
-from .downloader import Video, url_manager, users_links
-
-import os
+from .service import (
+    Media, 
+    url_manager, 
+    download_media, 
+    send_media, 
+    users_links
+    )
 
 
 router = Router()
@@ -25,28 +30,39 @@ async def main_handler(message: types.Message):
         await url_manager(message, bot_message)
 
 
-@router.callback_query(VideoCallback.filter(F.action == "quality"))
-async def download_video_callback(
-    query: types.CallbackQuery, callback_data: VideoCallback
+@router.callback_query(MediaCallback.filter(F.action == "quality"))
+async def download_media_callback(
+    query: types.CallbackQuery, callback_data: MediaCallback
 ):
     bot_message = await query.message.answer(
-        "*Downloading video, please wait...*", parse_mode="Markdown"
+        "*Downloading ...*", parse_mode="Markdown"
     )
 
     user_id = query.message.chat.id
     chosen_quality = callback_data.quality
     counter = int(callback_data.url_count)
     url = users_links[user_id][counter]
+    pth = os.getcwd().removesuffix("/src/bot") # add path to meta
 
-    video = Video(url, user_id)
-    file_data = await monitor_downloading(video, chosen_quality, bot_message)
+    media = Media(url, user_id)
+    downloaded_media = await download_media(media, chosen_quality, bot_message)
+    media_data = downloaded_media['data']
 
-    pth = os.getcwd().removesuffix("/src/bot")
-    file_name = f"{file_data['uuid']}.{file_data['ext']}"
+    uuid_name = f"{media_data['uuid']}.{media_data['ext']}"
+    title = media_data['title']
+    duration = media_data['duration']
+    file_path = pth + f"/media/{uuid_name}"
 
-    video_file = types.FSInputFile(
-        path=pth + f"/media/{file_name}", filename=f"{file_name}"
-    )
+    await bot_message.edit_text("*Sending ...*", parse_mode="Markdown")
+    await send_media(
+        chat_id=user_id, 
+        bot_message=bot_message,
+        path_to_media=file_path, 
+        title=title, 
+        duration=duration
+        )
+    
+    #await video.delete(file_path) Deleting after sended
+    await bot_message.edit_text("*Enjoy Watching*", parse_mode="Markdown")
+    
 
-    await bot_message.edit_text("*Enjoy watching!*", parse_mode="Markdown")
-    await query.message.answer_video(video_file)
